@@ -53,6 +53,8 @@ fun ProjectScreen(
     vm: ProjectViewModel,
     onBack: () -> Unit,
     initialTab: String? = null,
+    /** The Members card on Overview. */
+    membersPanel: @Composable () -> Unit = {},
     /** Content of every tab but Overview, by tab name ("Docs", "Tasks"…); [openTab] switches tabs. */
     tabContent: @Composable (tab: String, openTab: (String) -> Unit) -> Unit,
 ) {
@@ -127,7 +129,7 @@ fun ProjectScreen(
                 else -> {
                     val current = ProjectTab.entries[tab]
                     when (current) {
-                        ProjectTab.Overview -> ProjectOverview(state, vm, onOpenTab = { name -> tab = ProjectTab.valueOf(name).ordinal })
+                        ProjectTab.Overview -> ProjectOverview(state, vm, onOpenTab = { name -> tab = ProjectTab.valueOf(name).ordinal }, membersPanel = membersPanel)
                         else -> if (current.comingIn != null) {
                             MessageBox(current.label, current.comingIn)
                         } else {

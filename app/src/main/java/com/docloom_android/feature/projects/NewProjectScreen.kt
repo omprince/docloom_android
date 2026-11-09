@@ -181,10 +181,12 @@ fun NewProjectScreen(
     vm: NewProjectViewModel,
     onBack: () -> Unit,
     onOpenProject: (String) -> Unit,
+    /** Start inside this organisation ("New project here"). */
+    initialOrgId: String? = null,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var name by remember { mutableStateOf("") }
-    var orgId by remember { mutableStateOf<String?>(null) }
+    var orgId by remember { mutableStateOf(initialOrgId) }
     var start by remember { mutableStateOf(StartKind.Blank) }
     var repoUrl by remember { mutableStateOf("") }
     var sql by remember { mutableStateOf("") }

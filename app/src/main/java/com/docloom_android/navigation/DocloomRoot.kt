@@ -64,6 +64,19 @@ import com.docloom_android.feature.errors.ErrorsScreen
 import com.docloom_android.feature.errors.ErrorsViewModel
 import com.docloom_android.feature.history.HistoryScreen
 import com.docloom_android.feature.map.MapScreen
+import com.docloom_android.feature.team.ApiKeysScreen
+import com.docloom_android.feature.team.GithubViewModel
+import com.docloom_android.feature.team.IntegrationsScreen
+import com.docloom_android.feature.team.InviteScreen
+import com.docloom_android.feature.team.InviteViewModel
+import com.docloom_android.feature.team.KeysViewModel
+import com.docloom_android.feature.team.MembersPanel
+import com.docloom_android.feature.team.MembersViewModel
+import com.docloom_android.feature.team.OrgListViewModel
+import com.docloom_android.feature.team.OrgViewModel
+import com.docloom_android.feature.team.OrganizationScreen
+import com.docloom_android.feature.team.OrganizationsScreen
+import com.docloom_android.feature.team.SharingScreen
 import com.docloom_android.feature.map.MapViewModel
 import com.docloom_android.feature.history.HistoryViewModel
 import com.docloom_android.feature.tasks.EditorTarget
@@ -93,7 +106,14 @@ import kotlinx.serialization.Serializable
 @Serializable data object MyTasksRoute
 @Serializable data object TodosRoute
 @Serializable data object SettingsRoute
-@Serializable data object NewProjectRoute
+/** [orgId]: create the project inside that organisation. */
+@Serializable data class NewProjectRoute(val orgId: String? = null)
+@Serializable data object OrganizationsRoute
+@Serializable data class OrganizationRoute(val id: String)
+@Serializable data object SharingRoute
+@Serializable data object ApiKeysRoute
+@Serializable data object IntegrationsRoute
+@Serializable data object InviteRoute
 /** [tab] opens a project tab by name (e.g. "Tasks"); [taskId] opens that task on the board. */
 @Serializable data class ProjectRoute(val id: String, val tab: String? = null, val taskId: String? = null)
 
@@ -171,7 +191,7 @@ private fun MainShell(user: User) {
     val currentTab = TABS.firstOrNull { t -> current?.hasRoute(t.route::class) == true }
     val projectsVm: ProjectsViewModel = viewModel { ProjectsViewModel(container.projectsApi) }
     val openProject: (String) -> Unit = { id -> nav.navigate(ProjectRoute(id)) }
-    val newProject: () -> Unit = { nav.navigate(NewProjectRoute) }
+    val newProject: () -> Unit = { nav.navigate(NewProjectRoute()) }
 
     Scaffold(
         topBar = {
@@ -219,9 +239,54 @@ private fun MainShell(user: User) {
                 val vm: TodosViewModel = viewModel { TodosViewModel(container.tasksApi) }
                 TodosScreen(vm)
             }
-            composable<SettingsRoute> { SettingsScreen(user, container.sessionRepository) }
+            composable<SettingsRoute> {
+                SettingsScreen(user, container.sessionRepository) { page ->
+                    when (page) {
+                        "organizations" -> nav.navigate(OrganizationsRoute)
+                        "sharing" -> nav.navigate(SharingRoute)
+                        "keys" -> nav.navigate(ApiKeysRoute)
+                        "integrations" -> nav.navigate(IntegrationsRoute)
+                        "invite" -> nav.navigate(InviteRoute)
+                    }
+                }
+            }
+            composable<OrganizationsRoute> {
+                val vm: OrgListViewModel = viewModel { OrgListViewModel(container.teamApi) }
+                OrganizationsScreen(vm, onBack = { nav.popBackStack() }, onOpen = { nav.navigate(OrganizationRoute(it)) })
+            }
+            composable<OrganizationRoute> { entry ->
+                val id = entry.toRoute<OrganizationRoute>().id
+                val vm: OrgViewModel = viewModel { OrgViewModel(container.teamApi, id, user.id) }
+                OrganizationScreen(
+                    vm, user.id,
+                    onBack = {
+                        projectsVm.load(refresh = true)
+                        nav.popBackStack()
+                    },
+                    onOpenProject = openProject,
+                    onNewProject = { nav.navigate(NewProjectRoute(orgId = id)) },
+                )
+            }
+            composable<SharingRoute> { SharingScreen(projectsVm, onBack = { nav.popBackStack() }, onOpenProject = openProject) }
+            composable<ApiKeysRoute> {
+                val vm: KeysViewModel = viewModel { KeysViewModel(container.teamApi) }
+                ApiKeysScreen(vm, onBack = { nav.popBackStack() })
+            }
+            composable<IntegrationsRoute> {
+                val vm: GithubViewModel = viewModel { GithubViewModel(container.teamApi) }
+                IntegrationsScreen(vm, onBack = { nav.popBackStack() })
+            }
+            composable<InviteRoute> {
+                val vm: InviteViewModel = viewModel { InviteViewModel(container.teamApi) }
+                InviteScreen(vm, user, onBack = { nav.popBackStack() }) { joined ->
+                    projectsVm.load(refresh = true)
+                    val target: Any = if (joined.kind == "project") ProjectRoute(joined.id) else OrganizationRoute(joined.id)
+                    nav.navigate(target) { popUpTo<InviteRoute> { inclusive = true } }
+                }
+            }
 
-            composable<NewProjectRoute> {
+            composable<NewProjectRoute> { entry ->
+                val orgId = entry.toRoute<NewProjectRoute>().orgId
                 val vm: NewProjectViewModel = viewModel { NewProjectViewModel(container.projectsApi) }
                 NewProjectScreen(
                     vm,
@@ -230,6 +295,7 @@ private fun MainShell(user: User) {
                         projectsVm.load(refresh = true)
                         nav.navigate(ProjectRoute(id)) { popUpTo<NewProjectRoute> { inclusive = true } }
                     },
+                    initialOrgId = orgId,
                 )
             }
             composable<ProjectRoute> { entry ->
@@ -247,7 +313,22 @@ private fun MainShell(user: User) {
                 // A map node to bring into view: from a doc chip or an error.
                 var pendingFocus by rememberSaveable { mutableStateOf<String?>(null) }
                 val uri = LocalUriHandler.current
-                ProjectScreen(vm, onBack = { nav.popBackStack() }, initialTab = route.tab) { tab, openTab ->
+                val projectState by vm.state.collectAsStateWithLifecycle()
+                ProjectScreen(
+                    vm,
+                    onBack = { nav.popBackStack() },
+                    initialTab = route.tab,
+                    membersPanel = {
+                        val role = projectState.project?.role ?: "viewer"
+                        val members: MembersViewModel = viewModel(key = "members-$role") {
+                            MembersViewModel(container.teamApi, route.id, role == "owner", user.id, refreshProject)
+                        }
+                        MembersPanel(members, role, user.id) {
+                            projectsVm.load(refresh = true)
+                            nav.popBackStack()
+                        }
+                    },
+                ) { tab, openTab ->
                     // Each tab's ViewModel is created the first time it's shown and kept while the project is open.
                     when (tab) {
                         "Tasks" -> {

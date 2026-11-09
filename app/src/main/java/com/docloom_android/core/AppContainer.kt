@@ -8,6 +8,7 @@ import com.docloom_android.core.auth.TokenStore
 import com.docloom_android.core.network.ApiClient
 import com.docloom_android.feature.docs.DocsApi
 import com.docloom_android.feature.map.MapApi
+import com.docloom_android.feature.team.TeamApi
 import com.docloom_android.feature.map.MapLiveStream
 import com.docloom_android.feature.projects.ProjectsApi
 import com.docloom_android.feature.tasks.TasksApi
@@ -42,5 +43,6 @@ class AppContainer(context: Context) {
     val tasksApi: TasksApi = api.create(TasksApi::class.java)
     val docsApi: DocsApi = api.create(DocsApi::class.java)
     val mapApi: MapApi = api.create(MapApi::class.java)
+    val teamApi: TeamApi = api.create(TeamApi::class.java)
     val mapLiveStream = MapLiveStream(BuildConfig.API_BASE_URL, api.okHttp)
 }

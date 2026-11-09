@@ -49,7 +49,7 @@ import com.docloom_android.ui.theme.SuccessGreen
 
 /** Port of the website's ProjectOverview. [onOpenTab] takes a ProjectTab name. */
 @Composable
-fun ProjectOverview(state: ProjectState, vm: ProjectViewModel, onOpenTab: (String) -> Unit) {
+fun ProjectOverview(state: ProjectState, vm: ProjectViewModel, onOpenTab: (String) -> Unit, membersPanel: @Composable () -> Unit = {}) {
     val project = state.project ?: return
     val isOwner = project.role == "owner"
     val busy = state.busy != null
@@ -124,6 +124,8 @@ fun ProjectOverview(state: ProjectState, vm: ProjectViewModel, onOpenTab: (Strin
                 if (!state.github.connected) MutedText("Connect GitHub in Settings → Integrations on the website to sync.")
             }
         }
+
+        membersPanel()
 
         SectionCard("Recent changes", actionLabel = "Full history", onAction = { onOpenTab("History") }) {
             if (state.recent.isEmpty()) {

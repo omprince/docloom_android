@@ -47,7 +47,7 @@ private val THEMES = listOf("dark" to "Dark", "light" to "Light", "system" to "S
 
 /** Port of the website's AccountSettings (/dashboard/settings). */
 @Composable
-fun SettingsScreen(user: User, session: SessionRepository) {
+fun SettingsScreen(user: User, session: SessionRepository, onOpen: (String) -> Unit = {}) {
     val theme by session.theme.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var notice by remember { mutableStateOf<Notice?>(null) }
@@ -75,6 +75,20 @@ fun SettingsScreen(user: User, session: SessionRepository) {
                 Column(Modifier.weight(1f)) {
                     MutedText("Email")
                     Text(user.email, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+
+        SectionCard("Workspace") {
+            listOf(
+                "organizations" to "Organisations: teams that share projects",
+                "sharing" to "Members: who you share projects with",
+                "keys" to "AI & API keys: connect Claude over MCP",
+                "integrations" to "Integrations: GitHub",
+                "invite" to "Open an invite link",
+            ).forEach { (key, label) ->
+                TextButton(onClick = { onOpen(key) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(label, modifier = Modifier.fillMaxWidth())
                 }
             }
         }

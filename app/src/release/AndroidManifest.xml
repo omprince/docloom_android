@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release: invite and password-reset links on the website open the app.
+     autoVerify needs https://<website>/.well-known/assetlinks.json with the
+     release signing key's SHA-256 (see ANDROID_RELEASE.md). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <activity android:name=".MainActivity" tools:node="merge">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${websiteHost}" android:pathPrefix="/invite/" />
+                <data android:path="/reset-password" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

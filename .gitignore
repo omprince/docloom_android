@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Signing keys and their passwords never go into Git
+*.jks
+*.keystore
+keystore.properties

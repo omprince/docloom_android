@@ -372,9 +372,11 @@ private val ROLE_TEXT = mapOf(
 
 /** Paste an invite link to see what it's for and accept it (website /invite/[token]). */
 @Composable
-fun InviteScreen(vm: InviteViewModel, user: User, onBack: () -> Unit, onJoined: (InviteAccepted) -> Unit) {
+fun InviteScreen(vm: InviteViewModel, user: User, onBack: () -> Unit, initialToken: String? = null, onJoined: (InviteAccepted) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
-    var link by remember { mutableStateOf("") }
+    var link by remember { mutableStateOf(initialToken ?: "") }
+    // Opened from an invite link: show what it's for straight away; joining still needs a tap.
+    LaunchedEffect(initialToken) { initialToken?.let { vm.open(it) } }
     LaunchedEffect(state.joined) { state.joined?.let(onJoined) }
 
     SubPage("Open an invite", onBack) {

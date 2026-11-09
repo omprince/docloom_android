@@ -38,6 +38,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.docloom_android.core.DeepLink
 import com.docloom_android.core.auth.SessionState
 import com.docloom_android.core.model.User
 import com.docloom_android.core.ui.LoadingBox
@@ -124,7 +125,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object SharingRoute
 @Serializable data object ApiKeysRoute
 @Serializable data object IntegrationsRoute
-@Serializable data object InviteRoute
+/** [token]: opened from an invite link. */
+@Serializable data class InviteRoute(val token: String? = null)
 /** [tab] opens a project tab by name (e.g. "Tasks"); [taskId] opens that task on the board. */
 @Serializable data class ProjectRoute(val id: String, val tab: String? = null, val taskId: String? = null)
 
@@ -151,6 +153,15 @@ private fun AuthNavHost() {
     val container = appContainer()
     val vm: AuthViewModel = viewModel { AuthViewModel(container.sessionRepository) }
     val nav = rememberNavController()
+    val link by container.deepLinks.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(link) {
+        val l = link
+        if (l is DeepLink.ResetPassword) {
+            container.deepLinks.consume(l)
+            nav.navigate(ResetPasswordRoute(l.token))
+        }
+        // An invite stays pending and opens once you've signed in.
+    }
 
     Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
         NavHost(nav, startDestination = LoginRoute) {
@@ -202,6 +213,18 @@ private fun MainShell(user: User) {
     val currentTab = TABS.firstOrNull { t -> current?.hasRoute(t.route::class) == true }
     val projectsVm: ProjectsViewModel = viewModel { ProjectsViewModel(container.projectsApi) }
     val openProject: (String) -> Unit = { id -> nav.navigate(ProjectRoute(id)) }
+    val link by container.deepLinks.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(link) {
+        when (val l = link) {
+            is DeepLink.Invite -> {
+                container.deepLinks.consume(l)
+                nav.navigate(InviteRoute(l.token))
+            }
+            // A reset link while signed in: nothing to do, the account is open.
+            is DeepLink.ResetPassword -> container.deepLinks.consume(l)
+            null -> Unit
+        }
+    }
     val newProject: () -> Unit = { nav.navigate(NewProjectRoute()) }
 
     Scaffold(
@@ -279,7 +302,7 @@ private fun MainShell(user: User) {
                         "sharing" -> nav.navigate(SharingRoute)
                         "keys" -> nav.navigate(ApiKeysRoute)
                         "integrations" -> nav.navigate(IntegrationsRoute)
-                        "invite" -> nav.navigate(InviteRoute)
+                        "invite" -> nav.navigate(InviteRoute())
                     }
                 }
             }
@@ -309,9 +332,10 @@ private fun MainShell(user: User) {
                 val vm: GithubViewModel = viewModel { GithubViewModel(container.teamApi) }
                 IntegrationsScreen(vm, onBack = { nav.popBackStack() })
             }
-            composable<InviteRoute> {
+            composable<InviteRoute> { entry ->
+                val token = entry.toRoute<InviteRoute>().token
                 val vm: InviteViewModel = viewModel { InviteViewModel(container.teamApi) }
-                InviteScreen(vm, user, onBack = { nav.popBackStack() }) { joined ->
+                InviteScreen(vm, user, onBack = { nav.popBackStack() }, initialToken = token) { joined ->
                     projectsVm.load(refresh = true)
                     val target: Any = if (joined.kind == "project") ProjectRoute(joined.id) else OrganizationRoute(joined.id)
                     nav.navigate(target) { popUpTo<InviteRoute> { inclusive = true } }

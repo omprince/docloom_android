@@ -28,6 +28,9 @@ class AppContainer(context: Context) {
 
     val tokenStore = TokenStore(context.applicationContext)
 
+    /** Website links the app was opened with (MainActivity). */
+    val deepLinks = DeepLinkInbox()
+
     val api = ApiClient(
         baseUrl = BuildConfig.API_BASE_URL,
         tokenProvider = { tokenStore.currentToken() },

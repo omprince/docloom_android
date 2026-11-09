@@ -1,3 +1,4 @@
+import java.net.URI
 import java.util.Properties
 
 plugins {
@@ -18,6 +19,19 @@ val localProps = Properties().apply {
 fun apiUrl(key: String, fallback: String): String =
     (localProps.getProperty(key) ?: fallback).trim().trimEnd('/')
 
+/** A setting from local.properties, or else the environment (CI). */
+fun setting(key: String): String? =
+    localProps.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() } ?: System.getenv(key)?.takeIf { it.isNotEmpty() }
+
+// Release signing (upload key). Never commit the keystore or its passwords:
+//   DOCLOOM_KEYSTORE=C:/keys/docloom-upload.jks   (path to the .jks file)
+//   DOCLOOM_KEYSTORE_PASSWORD=...
+//   DOCLOOM_KEY_ALIAS=upload
+//   DOCLOOM_KEY_PASSWORD=...
+// in local.properties or as environment variables. Without them the release
+// APK/AAB is built unsigned.
+val releaseKeystore = setting("DOCLOOM_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+
 android {
     namespace = "com.docloom_android"
     compileSdk {
@@ -34,19 +48,44 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = setting("DOCLOOM_KEYSTORE_PASSWORD")
+                keyAlias = setting("DOCLOOM_KEY_ALIAS")
+                keyPassword = setting("DOCLOOM_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
+            optimization { enable = true } // TEMP-R8-SMOKE-TEST
             buildConfigField("String", "API_BASE_URL", "\"${apiUrl("API_BASE_URL_DEBUG", "http://10.0.2.2:3001")}\"")
-            buildConfigField("String", "WEBSITE_URL", "\"${apiUrl("WEBSITE_URL_DEBUG", "http://10.0.2.2:3000")}\"")
+            val websiteDebug = apiUrl("WEBSITE_URL_DEBUG", "http://10.0.2.2:3000")
+            buildConfigField("String", "WEBSITE_URL", "\"$websiteDebug\"")
+            URI(websiteDebug).let { site ->
+                manifestPlaceholders["websiteScheme"] = site.scheme
+                manifestPlaceholders["websiteHost"] = site.host
+                manifestPlaceholders["websitePort"] = if (site.port > 0) site.port.toString() else if (site.scheme == "https") "443" else "80"
+            }
         }
         release {
             val releaseUrl = apiUrl("API_BASE_URL_RELEASE", "https://api.example.com")
+            val websiteUrl = apiUrl("WEBSITE_URL_RELEASE", "https://example.com")
             require(releaseUrl.startsWith("https://")) { "API_BASE_URL_RELEASE must use https://" }
+            require(websiteUrl.startsWith("https://")) { "WEBSITE_URL_RELEASE must use https://" }
             buildConfigField("String", "API_BASE_URL", "\"$releaseUrl\"")
-            buildConfigField("String", "WEBSITE_URL", "\"${apiUrl("WEBSITE_URL_RELEASE", "https://example.com")}\"")
+            buildConfigField("String", "WEBSITE_URL", "\"$websiteUrl\"")
+            // Invite and password-reset links on the website open the app (src/release/AndroidManifest.xml).
+            manifestPlaceholders["websiteHost"] = URI(websiteUrl).host
+            // R8: shrink, obfuscate and optimise. Keep rules: src/main/keepRules/rules.keep.
             optimization {
-                enable = false
+                enable = true
             }
+            isDebuggable = false
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
     compileOptions {

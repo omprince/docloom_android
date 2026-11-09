@@ -1,12 +1,23 @@
-# Add project specific R8 rules here.
-# AGP will combine all keep rule files in src/main/keepRules to pass to R8
+# R8 keep rules for DocLoom (AGP combines every file in src/main/keepRules).
 #
-# For more details, see
-#   https://d.android.com/r/tools/r8/keep-rules
+# Most libraries ship their own rules: kotlinx.serialization keeps
+# @Serializable classes and their serializers, Retrofit keeps its annotated
+# interfaces and suspend-function signatures, Tink keeps its key managers.
+# Only what those miss belongs here.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Retrofit reads generic return types (e.g. Response<SectionResponse>) by reflection.
+-keepattributes Signature, InnerClasses, EnclosingMethod, RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
+
+# The API interfaces are only reached through Retrofit's proxies.
+-keep,allowobfuscation interface com.docloom_android.**.*Api
+-keep,allowobfuscation interface com.docloom_android.core.auth.AuthApi
+
+# Navigation's type-safe routes are found through their serializers.
+-keep @kotlinx.serialization.Serializable class com.docloom_android.navigation.** { *; }
+
+# Release builds log nothing: strip verbose/debug/info logging as a safety net.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}

@@ -51,6 +51,7 @@ import com.docloom_android.core.ui.SectionCard
 import com.docloom_android.core.ui.timeAgo
 import com.docloom_android.feature.docs.DocsApi
 import com.docloom_android.feature.tasks.Pill
+import com.docloom_android.feature.team.SecureWhileShown
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -250,6 +251,8 @@ private fun SendErrorsCard(state: ErrorsState, onShowKey: () -> Unit, onRotate: 
         if (key == null) {
             OutlinedButton(onClick = onShowKey, enabled = state.busy != "key", shape = RoundedCornerShape(50)) { Text("Show project key") }
         } else {
+            // The key lets anyone report errors into this project: keep it out of screenshots.
+            SecureWhileShown()
             CopyableCode("Project key", key, sensitive = true)
         }
         CopyableCode("Example", curl, sensitive = key != null)

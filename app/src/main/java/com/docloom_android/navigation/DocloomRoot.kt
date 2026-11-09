@@ -64,6 +64,15 @@ import com.docloom_android.feature.errors.ErrorsScreen
 import com.docloom_android.feature.errors.ErrorsViewModel
 import com.docloom_android.feature.history.HistoryScreen
 import com.docloom_android.feature.map.MapScreen
+import com.docloom_android.feature.studio.AssetScreen
+import com.docloom_android.feature.studio.AssetViewModel
+import com.docloom_android.feature.studio.StudioScreen
+import com.docloom_android.feature.studio.StudioViewModel
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import com.docloom_android.feature.team.ApiKeysScreen
 import com.docloom_android.feature.team.GithubViewModel
 import com.docloom_android.feature.team.IntegrationsScreen
@@ -105,6 +114,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object ProjectsRoute
 @Serializable data object MyTasksRoute
 @Serializable data object TodosRoute
+@Serializable data object StudioRoute
+@Serializable data class AssetRoute(val projectId: String, val assetId: String)
 @Serializable data object SettingsRoute
 /** [orgId]: create the project inside that organisation. */
 @Serializable data class NewProjectRoute(val orgId: String? = null)
@@ -172,8 +183,8 @@ private data class Tab(val route: Any, val label: String, val icon: ImageVector)
 private val TABS = listOf(
     Tab(HomeRoute, "Home", Icons.Outlined.Home),
     Tab(ProjectsRoute, "Projects", Icons.Outlined.GridView),
-    Tab(MyTasksRoute, "My tasks", Icons.AutoMirrored.Outlined.Assignment),
-    Tab(TodosRoute, "Todos", Icons.Outlined.Checklist),
+    Tab(MyTasksRoute, "Tasks", Icons.AutoMirrored.Outlined.Assignment),
+    Tab(StudioRoute, "Studio", Icons.Outlined.Image),
     Tab(SettingsRoute, "Settings", Icons.Outlined.Settings),
 )
 
@@ -228,16 +239,38 @@ private fun MainShell(user: User) {
             }
             composable<ProjectsRoute> { ProjectsScreen(projectsVm, openProject, newProject) }
             composable<MyTasksRoute> {
-                val vm: MyTasksViewModel = viewModel { MyTasksViewModel(container.tasksApi) }
-                MyTasksScreen(
-                    vm,
-                    onOpenTask = { pid, tid -> nav.navigate(ProjectRoute(pid, tab = "Tasks", taskId = tid)) },
-                    onProjects = { navigateToTab(nav, ProjectsRoute) },
-                )
+                // The website's "My tasks" and "Todos" share one tab here (a bottom bar holds five).
+                var todos by rememberSaveable { mutableStateOf(false) }
+                Column {
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        SegmentedButton(selected = !todos, onClick = { todos = false }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("My tasks") }
+                        SegmentedButton(selected = todos, onClick = { todos = true }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Todos") }
+                    }
+                    if (todos) {
+                        val vm: TodosViewModel = viewModel { TodosViewModel(container.tasksApi) }
+                        TodosScreen(vm)
+                    } else {
+                        val vm: MyTasksViewModel = viewModel { MyTasksViewModel(container.tasksApi) }
+                        MyTasksScreen(
+                            vm,
+                            onOpenTask = { pid, tid -> nav.navigate(ProjectRoute(pid, tab = "Tasks", taskId = tid)) },
+                            onProjects = { navigateToTab(nav, ProjectsRoute) },
+                        )
+                    }
+                }
             }
-            composable<TodosRoute> {
-                val vm: TodosViewModel = viewModel { TodosViewModel(container.tasksApi) }
-                TodosScreen(vm)
+            composable<StudioRoute> {
+                val vm: StudioViewModel = viewModel { StudioViewModel(container.studioApi) }
+                val projectsState by projectsVm.state.collectAsStateWithLifecycle()
+                StudioScreen(vm, container.studioImages, projectsState.projects) { pid, aid -> nav.navigate(AssetRoute(pid, aid)) }
+            }
+            composable<AssetRoute> { entry ->
+                val route = entry.toRoute<AssetRoute>()
+                val viewer = projectsVm.state.value.projects.firstOrNull { it.id == route.projectId }?.role == "viewer"
+                val vm: AssetViewModel = viewModel {
+                    AssetViewModel(container.studioApi, container.studioImages, route.projectId, route.assetId, viewer)
+                }
+                AssetScreen(vm, onBack = { nav.popBackStack() })
             }
             composable<SettingsRoute> {
                 SettingsScreen(user, container.sessionRepository) { page ->

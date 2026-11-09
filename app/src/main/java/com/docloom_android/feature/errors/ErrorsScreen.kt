@@ -121,7 +121,7 @@ class ErrorsViewModel(
 }
 
 @Composable
-fun ErrorsScreen(vm: ErrorsViewModel) {
+fun ErrorsScreen(vm: ErrorsViewModel, onShowOnMap: (String) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf<String?>(null) }
     var confirmRotate by remember { mutableStateOf(false) }
@@ -159,6 +159,7 @@ fun ErrorsScreen(vm: ErrorsViewModel) {
                     busy = state.busy == e.id,
                     onToggleStack = { expanded = if (expanded == e.id) null else e.id },
                     onResolve = { vm.setResolved(e.id, !e.resolved) },
+                    onShowOnMap = onShowOnMap,
                 )
             }
             item { SendErrorsCard(state, onShowKey = { vm.loadKey(false) }, onRotate = { confirmRotate = true }) }
@@ -182,7 +183,7 @@ fun ErrorsScreen(vm: ErrorsViewModel) {
 }
 
 @Composable
-private fun ErrorCard(e: ErrorEvent, expanded: Boolean, busy: Boolean, onToggleStack: () -> Unit, onResolve: () -> Unit) {
+private fun ErrorCard(e: ErrorEvent, expanded: Boolean, busy: Boolean, onToggleStack: () -> Unit, onResolve: () -> Unit, onShowOnMap: (String) -> Unit) {
     GlassCard(Modifier.fillMaxWidth().alpha(if (e.resolved) 0.6f else 1f)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -199,7 +200,13 @@ private fun ErrorCard(e: ErrorEvent, expanded: Boolean, busy: Boolean, onToggleS
             }
             Text(e.message, fontWeight = FontWeight.Medium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (e.nodeId != null) Pill("At: ${e.nodeLabel ?: "a node"}", accent = true) else MutedText("Not matched to a node yet")
+                if (e.nodeId != null) {
+                    TextButton(onClick = { onShowOnMap(e.nodeId) }, contentPadding = PaddingValues(0.dp)) {
+                        Pill("At: ${e.nodeLabel ?: "a node"} → show on map", accent = true)
+                    }
+                } else {
+                    MutedText("Not matched to a node yet")
+                }
             }
             Row {
                 if (e.stack != null) {

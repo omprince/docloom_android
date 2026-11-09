@@ -63,6 +63,8 @@ import com.docloom_android.feature.docs.SectionScreen
 import com.docloom_android.feature.errors.ErrorsScreen
 import com.docloom_android.feature.errors.ErrorsViewModel
 import com.docloom_android.feature.history.HistoryScreen
+import com.docloom_android.feature.map.MapScreen
+import com.docloom_android.feature.map.MapViewModel
 import com.docloom_android.feature.history.HistoryViewModel
 import com.docloom_android.feature.tasks.EditorTarget
 import com.docloom_android.feature.tasks.repoName
@@ -242,6 +244,8 @@ private fun MainShell(user: User) {
                 }
                 // A task to open on the board: from My tasks, or a task chip in the docs.
                 var pendingTask by rememberSaveable { mutableStateOf(route.taskId) }
+                // A map node to bring into view: from a doc chip or an error.
+                var pendingFocus by rememberSaveable { mutableStateOf<String?>(null) }
                 val uri = LocalUriHandler.current
                 ProjectScreen(vm, onBack = { nav.popBackStack() }, initialTab = route.tab) { tab, openTab ->
                     // Each tab's ViewModel is created the first time it's shown and kept while the project is open.
@@ -269,7 +273,10 @@ private fun MainShell(user: User) {
                                             openTab("Tasks")
                                         }
                                         "section" -> docs.openSection(value)
-                                        "node" -> openTab("Map")
+                                        "node" -> {
+                                            pendingFocus = value
+                                            openTab("Map")
+                                        }
                                         "repo" -> uri.openUri("https://github.com/$value")
                                         "branch" -> docsState.github.repoUrl
                                             ?.let { repoName(it) }
@@ -278,13 +285,30 @@ private fun MainShell(user: User) {
                                 }
                             }
                         }
+                        "Map" -> {
+                            val viewer = vm.state.value.project?.role == "viewer"
+                            val map: MapViewModel = viewModel {
+                                MapViewModel(container.mapApi, container.mapLiveStream, route.id, viewer, pendingFocus)
+                            }
+                            LaunchedEffect(pendingFocus) {
+                                pendingFocus?.let { map.focus(it) }
+                                pendingFocus = null
+                            }
+                            MapScreen(map) { taskId ->
+                                pendingTask = taskId
+                                openTab("Tasks")
+                            }
+                        }
                         "History" -> {
                             val history: HistoryViewModel = viewModel { HistoryViewModel(container.docsApi, route.id, refreshProject) }
                             HistoryScreen(history)
                         }
                         "Errors" -> {
                             val errors: ErrorsViewModel = viewModel { ErrorsViewModel(container.docsApi, route.id, refreshProject) }
-                            ErrorsScreen(errors)
+                            ErrorsScreen(errors) { nodeId ->
+                                pendingFocus = nodeId
+                                openTab("Map")
+                            }
                         }
                     }
                 }

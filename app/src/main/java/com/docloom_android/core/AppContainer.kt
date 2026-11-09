@@ -7,6 +7,8 @@ import com.docloom_android.core.auth.SessionRepository
 import com.docloom_android.core.auth.TokenStore
 import com.docloom_android.core.network.ApiClient
 import com.docloom_android.feature.docs.DocsApi
+import com.docloom_android.feature.map.MapApi
+import com.docloom_android.feature.map.MapLiveStream
 import com.docloom_android.feature.projects.ProjectsApi
 import com.docloom_android.feature.tasks.TasksApi
 import kotlinx.coroutines.CoroutineScope
@@ -39,4 +41,6 @@ class AppContainer(context: Context) {
     val projectsApi: ProjectsApi = api.create(ProjectsApi::class.java)
     val tasksApi: TasksApi = api.create(TasksApi::class.java)
     val docsApi: DocsApi = api.create(DocsApi::class.java)
+    val mapApi: MapApi = api.create(MapApi::class.java)
+    val mapLiveStream = MapLiveStream(BuildConfig.API_BASE_URL, api.okHttp)
 }

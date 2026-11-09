@@ -39,7 +39,7 @@ import com.docloom_android.ui.theme.WarningAmber
 
 private enum class ProjectTab(val label: String, val comingIn: String?) {
     Overview("Overview", null),
-    Map("Map", "The architecture map comes in phase 5."),
+    Map("Map", null),
     Docs("Docs", null),
     History("History", null),
     Errors("Errors", null),
